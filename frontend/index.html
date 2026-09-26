@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI漫剧一键生成平台</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #141a26; --panel2: #1b2333; --border: #ffffff14;
+    --txt: #e8ecf3; --sub: #8b96ab; --accent: #7c5cff; --accent2: #00d4ff;
+    --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 80% -10%, #1b1440 0%, var(--bg) 55%);
+    color: var(--txt); font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 26px 40px 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 22px; font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header .tag {
+    font-size: 12px; color: var(--sub); border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 999px; background: var(--panel);
+  }
+  header .spacer { flex: 1; }
+  #user-box { display: none; align-items: center; gap: 12px; font-size: 13px; color: var(--sub); }
+  #user-box .uname { color: var(--txt); font-weight: 600; }
+  .btn-logout {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--sub);
+    padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;
+  }
+  .btn-logout:hover { color: var(--err); border-color: var(--err); }
+
+  main { display: grid; grid-template-columns: 440px 1fr; gap: 22px; padding: 10px 40px 40px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  #app { display: none; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 14px; color: var(--sub); font-weight: 600; margin-bottom: 14px; letter-spacing: .5px; }
+
+  label { display: block; font-size: 13px; color: var(--sub); margin: 14px 0 6px; }
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--txt);
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; outline: none; font-family: inherit;
+    transition: border .15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 84px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .char-row, .scene-row {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; margin-bottom: 10px; position: relative;
+  }
+  .char-row .row { grid-template-columns: 1fr 1fr; }
+  .del {
+    position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--sub);
+    cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  .del:hover { color: var(--err); }
+  .mini { font-size: 11px; color: var(--sub); margin: 6px 0 4px; }
+  .btn-add {
+    width: 100%; margin-top: 6px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px;
+    background: transparent; color: var(--accent2); cursor: pointer; font-size: 13px;
+  }
+  .btn-add:hover { border-color: var(--accent2); }
+  .btn-gen {
+    width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 12px; cursor: pointer;
+    font-size: 15px; font-weight: 700; color: #fff;
+    background: linear-gradient(90deg, var(--accent), #4f8cff);
+    box-shadow: 0 8px 24px #7c5cff44; transition: transform .12s, opacity .12s;
+  }
+  .btn-gen:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn-gen:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  .hint { font-size: 11px; color: var(--sub); margin-top: 10px; line-height: 1.7; }
+  .err-text { color: var(--err); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* 登录遮罩 */
+  #auth-overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #0b0e14cc; backdrop-filter: blur(6px); z-index: 50;
+  }
+  #auth-card { width: 360px; background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 28px; }
+  #auth-card h1 { font-size: 19px; margin-bottom: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #auth-card .sub2 { font-size: 12px; color: var(--sub); margin-bottom: 10px; }
+  .auth-tabs { display: flex; gap: 8px; margin: 14px 0 6px; }
+  .auth-tabs button {
+    flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--sub); cursor: pointer; font-size: 13px;
+  }
+  .auth-tabs button.active { color: #fff; border-color: var(--accent); background: #7c5cff22; }
+  .btn-auth {
+    width: 100%; margin-top: 18px; padding: 11px; border: none; border-radius: 10px;
+    background: linear-gradient(90deg, var(--accent), #4f8cff); color: #fff;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+
+  /* 进度 */
+  .progress-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .bar { flex: 1; height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; }
+  .bar i {
+    display: block; height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width .4s ease; box-shadow: 0 0 12px #7c5cff88;
+  }
+  #pct { font-size: 13px; color: var(--accent2); min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+  #status-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel2); color: var(--sub); border: 1px solid var(--border); }
+  #status-chip.run { color: var(--accent2); } #status-chip.done { color: var(--ok); } #status-chip.fail { color: var(--err); }
+  #status-chip.paused { color: var(--warn); }
+  #btn-pause {
+    font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--sub); cursor: pointer; white-space: nowrap;
+  }
+  #btn-pause:hover:not(:disabled) { border-color: var(--warn); color: var(--warn); }
+  #btn-pause:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* trace 时间线 */
+  #trace { margin-bottom: 16px; display: none; }
+  #trace.show { display: block; }
+  .tr-row { display: grid; grid-template-columns: 9px 76px 1fr auto; gap: 9px; align-items: center;
+    padding: 5px 0; font-size: 12.5px; border-bottom: 1px solid #ffffff08; }
+  .tr-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .tr-dot.LLM { background: #c084fc; } .tr-dot.画师 { background: var(--warn); }
+  .tr-dot.剪辑 { background: var(--ok); }
+  .tr-dot.error { background: var(--err); box-shadow: 0 0 8px var(--err); }
+  .tr-agent { color: var(--sub); font-size: 11.5px; }
+  .tr-step { color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr-step .tr-model { color: #5d6b85; font-size: 11px; margin-left: 6px; }
+  .tr-dur { color: var(--accent2); font-variant-numeric: tabular-nums; font-size: 11.5px; min-width: 52px; text-align: right; }
+  .tr-row.error .tr-step { color: var(--err); }
+
+  #log {
+    height: 260px; overflow-y: auto; background: #0a0d13; border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; font-family: Consolas, "Courier New", monospace;
+    font-size: 12.5px; line-height: 1.75;
+  }
+  #log .line { white-space: pre-wrap; word-break: break-all; }
+  #log .t { color: #55627a; }
+  #log .agent { font-weight: 700; margin-right: 6px; }
+  .a-system { color: #8b96ab; } .a-编排Agent { color: #c084fc; } .a-编剧Agent { color: #38bdf8; }
+  .a-画师Agent { color: #fbbf24; } .a-剪辑Agent { color: #34d399; }
+  .line.err .msg { color: var(--err); }
+  .msg { color: #c6cede; }
+
+  #video-panel { margin-top: 16px; display: none; }
+  #video-panel.show { display: block; }
+  video { width: 100%; max-height: 380px; border-radius: 12px; background: #000; border: 1px solid var(--border); }
+  #download {
+    display: inline-block; margin-top: 10px; padding: 8px 18px; border-radius: 10px; font-size: 13px;
+    background: linear-gradient(90deg, var(--accent), #4f8cff); color: #fff; text-decoration: none;
+  }
+  .empty-tip { color: var(--sub); font-size: 13px; text-align: center; padding: 30px 0; }
+
+  /* 我的作品 */
+  .work-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+    background: var(--panel2); border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer;
+  }
+  .work-row:hover { border-color: var(--accent2); }
+  .work-row .w-title { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .w-chip { font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--sub); }
+  .w-chip.running { color: var(--accent2); } .w-chip.done { color: var(--ok); } .w-chip.failed { color: var(--err); }
+  .w-time { font-size: 10.5px; color: #5d6b85; }
+</style>
+</head>
+<body>
+
+<!-- 登录/注册 -->
+<div id="auth-overlay">
+  <div id="auth-card">
+    <h1>AI漫剧一键生成平台</h1>
+    <div class="sub2">多Agent协作：编排 / 编剧 / 画师 / 剪辑 · 阿里云百炼</div>
+    <div class="auth-tabs">
+      <button id="tab-login" class="active">登录</button>
+      <button id="tab-register">注册</button>
+    </div>
+    <label>用户名</label>
+    <input type="text" id="auth-username" placeholder="2~32 位" autocomplete="username">
+    <label>密码</label>
+    <input type="password" id="auth-password" placeholder="至少 6 位" autocomplete="current-password">
+    <button class="btn-auth" id="auth-submit">登录</button>
+    <div class="err-text" id="auth-err"></div>
+  </div>
+</div>
+
+<header>
+  <h1>AI漫剧一键生成平台</h1>
+  <span class="tag">多Agent 协作 · 编排/编剧/画师/剪辑</span>
+  <span class="tag">阿里云百炼 · Qwen / 万相</span>
+  <span class="spacer"></span>
+  <div id="user-box">
+    👤 <span class="uname" id="uname"></span>
+    <button class="btn-logout" id="btn-logout">退出登录</button>
+  </div>
+</header>
+
+<main id="app">
+  <!-- 左：表单 + 我的作品 -->
+  <div>
+    <section class="card">
+      <h2>① 输入你的漫剧创意</h2>
+      <form id="gen-form" autocomplete="off">
+        <label for="plot">剧情梗概 <span style="color:#55627a" id="plot-count">0/500</span></label>
+        <textarea id="plot" maxlength="500" placeholder="例如：少年意外获得一本能预知灾难的古书，却发现写下预言的正是未来的自己……"></textarea>
+
+        <label>角色设定（可动态添加）</label>
+        <div id="char-list"></div>
+        <button type="button" class="btn-add" id="add-char">＋ 添加角色</button>
+
+        <label>场景设定（可动态添加）</label>
+        <div id="scene-list"></div>
+        <button type="button" class="btn-add" id="add-scene">＋ 添加场景</button>
+
+        <div class="row" style="margin-top:16px">
+          <div>
+            <label for="style">画风</label>
+            <select id="style">
+              <option value="国漫">国漫</option>
+              <option value="日系">日系</option>
+              <option value="Q版">Q版</option>
+              <option value="水墨古风">水墨古风</option>
+            </select>
+          </div>
+          <div>
+            <label for="aspect">画幅</label>
+            <select id="aspect">
+              <option value="9:16">9:16 竖屏</option>
+              <option value="16:9">16:9 横屏</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-gen" id="gen-btn">⚡ 一键生成漫剧</button>
+        <div class="err-text" id="form-err"></div>
+        <div class="hint">提示：剧情 1~500 字，至少 1 个角色 + 1 个场景。生成约 3~10 分钟，排队/进度可实时查看。</div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>③ 我的作品</h2>
+      <div id="works"><div class="empty-tip">还没有作品，先生成一部吧</div></div>
+    </section>
+  </div>
+
+  <!-- 右：进度 + trace + 日志 + 视频 -->
+  <section class="card">
+    <h2>② 生成进度 · 链路追踪 · Agent 实时日志</h2>
+    <div class="progress-wrap">
+      <div class="bar"><i id="bar"></i></div>
+      <span id="pct">0%</span>
+      <span id="status-chip">等待输入</span>
+      <button id="btn-pause" disabled>⏸ 暂停</button>
+    </div>
+
+    <div id="trace">
+      <div class="tr-row" style="border:none">
+        <span></span><span class="tr-agent">Agent</span>
+        <span class="tr-step">步骤 / 模型</span><span class="tr-dur">耗时</span>
+      </div>
+      <div id="trace-rows"></div>
+    </div>
+
+    <div id="log"><div class="empty-tip" id="log-tip">提交任务后，这里实时滚动每个 Agent 的思考与动作……</div></div>
+    <div id="video-panel">
+      <video id="player" controls playsinline></video>
+      <a id="download" href="#" download>⬇ 下载 MP4 成片</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const AGENT_CLASS = { 系统: 'a-system', 编排Agent: 'a-编排Agent', 编剧Agent: 'a-编剧Agent', 画师Agent: 'a-画师Agent', 剪辑Agent: 'a-剪辑Agent' };
+
+// ================= 认证 =================
+let TOKEN = localStorage.getItem('token') || '';
+let authMode = 'login';
+
+function setAuthTab(mode) {
+  authMode = mode;
+  $('tab-login').classList.toggle('active', mode === 'login');
+  $('tab-register').classList.toggle('active', mode === 'register');
+  $('auth-submit').textContent = mode === 'login' ? '登录' : '注册';
+  hideErr($('auth-err'));
+}
+$('tab-login').onclick = () => setAuthTab('login');
+$('tab-register').onclick = () => setAuthTab('register');
+
+$('auth-submit').onclick = async () => {
+  const username = $('auth-username').value.trim();
+  const password = $('auth-password').value;
+  if (username.length < 2) return showErr($('auth-err'), '用户名至少 2 位');
+  if (password.length < 6) return showErr($('auth-err'), '密码至少 6 位');
+  try {
+    const resp = await fetch(`/api/auth/${authMode}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.detail || '认证失败');
+    TOKEN = body.access_token;
+    localStorage.setItem('token', TOKEN);
+    enterApp(body.username);
+  } catch (e) {
+    showErr($('auth-err'), e.message);
+  }
+};
+
+$('btn-logout').onclick = () => {
+  localStorage.removeItem('token');
+  location.reload();
+};
+
+async function boot() {
+  if (!TOKEN) return;
+  try {
+    const resp = await api('/auth/me');
+    const me = await resp.json();
+    if (!resp.ok) throw new Error();
+    enterApp(me.username);
+  } catch {
+    localStorage.removeItem('token');
+  }
+}
+
+function enterApp(username) {
+  $('auth-overlay').style.display = 'none';
+  $('app').style.display = 'grid';
+  $('user-box').style.display = 'flex';
+  $('uname').textContent = username;
+  loadWorks();
+}
+
+// 带鉴权的 fetch 封装
+function api(path, opts = {}) {
+  opts.headers = Object.assign({ 'Authorization': `Bearer ${TOKEN}`,
+    'Content-Type': 'application/json' }, opts.headers || {});
+  return fetch('/api' + path, opts);
+}
+
+// ================= 动态表单 =================
+function addCharacter(data = {}) {
+  const div = document.createElement('div');
+  div.className = 'char-row';
+  div.innerHTML = `
+    <button type="button" class="del" title="删除">✕</button>
+    <div class="mini">角色</div>
+    <div class="row">
+      <input type="text" placeholder="姓名" value="${data.name || ''}" data-k="name">
+      <select data-k="gender">
+        <option value="男">男</option><option value="女">女</option><option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="text" placeholder="年龄（如 18）" value="${data.age || ''}" data-k="age">
+      <input type="text" placeholder="性格（如 活泼）" value="${data.personality || ''}" data-k="personality">
+    </div>
+    <input type="text" placeholder="外貌描述（发型/发色/服装等）" value="${data.appearance || ''}" data-k="appearance" style="margin-top:8px">
+  `;
+  div.querySelector('.del').onclick = () => div.remove();
+  if (data.gender) div.querySelector('[data-k=gender]').value = data.gender;
+  $('char-list').appendChild(div);
+}
+
+function addScene(data = {}) {
+  const div = document.createElement('div');
+  div.className = 'scene-row';
+  div.innerHTML = `
+    <button type="button" class="del" title="删除">✕</button>
+    <div class="mini">场景</div>
+    <input type="text" placeholder="场景名（如 雨夜老宅）" value="${data.name || ''}" data-k="name">
+    <input type="text" placeholder="氛围（如 阴森、紧张）" value="${data.atmosphere || ''}" data-k="atmosphere" style="margin-top:8px">
+  `;
+  div.querySelector('.del').onclick = () => div.remove();
+  $('scene-list').appendChild(div);
+}
+
+$('add-char').onclick = () => addCharacter();
+$('add-scene').onclick = () => addScene();
+addCharacter({ name: '林晓', gender: '女', age: '18', personality: '机灵勇敢', appearance: '黑色双马尾，红色发卡，白色连衣裙' });
+addCharacter({ name: '顾川', gender: '男', age: '20', personality: '冷静寡言', appearance: '银灰色短发，黑色风衣，左眼有泪痣' });
+addScene({ name: '雨夜旧城', atmosphere: '霓虹昏暗，细雨连绵' });
+addScene({ name: '天台', atmosphere: '风大，远处灯火' });
+$('plot').value = '少女林晓意外发现一张能改变明天的照片，为救回失踪的青梅竹马，她与神秘青年顾川踏上穿越时间的冒险。';
+
+$('plot').addEventListener('input', () => {
+  $('plot-count').textContent = `${$('plot').value.length}/500`;
+});
+
+function collectForm() {
+  const pick = sel => [...document.querySelectorAll(sel)].map(r => {
+    const g = {};
+    r.querySelectorAll('[data-k]').forEach(el => g[el.dataset.k] = el.value.trim());
+    return g;
+  });
+  return {
+    plot: $('plot').value.trim(),
+    characters: pick('.char-row').filter(c => c.name),
+    scenes: pick('.scene-row').filter(s => s.name),
+    style: $('style').value,
+    aspect: $('aspect').value,
+  };
+}
+
+// ================= 日志 =================
+function appendLog(ev) {
+  const tip = $('log-tip'); if (tip) tip.remove();
+  const line = document.createElement('div');
+  line.className = 'line' + (ev.type === 'error' ? ' err' : '');
+  const cls = AGENT_CLASS[ev.agent] || 'a-system';
+  line.innerHTML = `<span class="t">[${ev.ts || ''}]</span> <span class="agent ${cls}">[${ev.agent}]</span><span class="msg">${esc(ev.message || '')}</span>`;
+  const log = $('log');
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  log.appendChild(line);
+  if (nearBottom) log.scrollTop = log.scrollHeight;
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function setStatus(text, cls) {
+  const chip = $('status-chip');
+  chip.textContent = text;
+  chip.className = cls || '';
+}
+
+// ================= 链路追踪 =================
+let maxDur = 100;
+function addTrace(ev) {
+  $('trace').classList.add('show');
+  maxDur = Math.max(maxDur, ev.duration_ms);
+  const row = document.createElement('div');
+  row.className = 'tr-row' + (ev.status === 'error' ? ' error' : '');
+  const agentCls = ev.status === 'error' ? 'error' : (ev.agent || '');
+  const icon = ev.status === 'error' ? '✖' : '';
+  row.innerHTML = `
+    <span class="tr-dot ${agentCls}"></span>
+    <span class="tr-agent">${esc(ev.agent || '')}</span>
+    <span class="tr-step" title="${esc(ev.detail || ev.step || '')}">${icon} ${esc(ev.step || '')}<span class="tr-model">${esc(ev.model ? '· ' + ev.model : '')}</span></span>
+    <span class="tr-dur">${fmtDur(ev.duration_ms)}</span>`;
+  $('trace-rows').appendChild(row);
+}
+
+function fmtDur(ms) {
+  return ms >= 1000 ? (ms / 1000).toFixed(1) + ' s' : ms + ' ms';
+}
+
+function clearTrace() {
+  $('trace-rows').innerHTML = '';
+  $('trace').classList.remove('show');
+  maxDur = 100;
+}
+
+// ================= SSE =================
+let es = null;
+let currentTaskId = null;
+let paused = false;
+
+// 暂停/继续 UI 同步（由 SSE paused/resumed 事件驱动，保证以服务端状态为准）
+function setPausedUI(v) {
+  paused = v;
+  const b = $('btn-pause');
+  b.disabled = false;
+  b.textContent = v ? '▶ 继续' : '⏸ 暂停';
+  setStatus(v ? '已暂停' : '生成中', v ? 'paused' : 'run');
+}
+
+$('btn-pause').onclick = async () => {
+  if (!currentTaskId) return;
+  $('btn-pause').disabled = true;
+  try {
+    const resp = await api(`/tasks/${currentTaskId}/${paused ? 'resume' : 'pause'}`,
+                          { method: 'POST' });
+    if (!resp.ok) {
+      const b = await resp.json();
+      throw new Error(b.detail || '操作失败');
+    }
+  } catch (e) {
+    appendLog({ ts: '', agent: '系统', message: '控制操作失败：' + e.message });
+    $('btn-pause').disabled = false;
+  }
+};
+
+function connectSSE(taskId) {
+  if (es) es.close();
+  currentTaskId = taskId;
+  paused = false;
+  $('btn-pause').disabled = false;
+  $('btn-pause').textContent = '⏸ 暂停';
+  es = new EventSource(`/api/tasks/${taskId}/events?token=${encodeURIComponent(TOKEN)}`);
+  es.onmessage = e => {
+    let ev; try { ev = JSON.parse(e.data); } catch { return; }
+    if (ev.type === 'log') appendLog(ev);
+    else if (ev.type === 'trace') addTrace(ev);
+    else if (ev.type === 'progress') {
+      $('bar').style.width = ev.value + '%';
+      $('pct').textContent = ev.value + '%';
+    } else if (ev.type === 'paused') {
+      setPausedUI(true);
+    } else if (ev.type === 'resumed') {
+      setPausedUI(false);
+    } else if (ev.type === 'done') {
+      appendLog({ ts: '', agent: '系统', message: `成片就绪：${ev.video_url}` });
+      $('video-panel').classList.add('show');
+      $('player').src = ev.video_url;
+      $('download').href = ev.video_url;
+      setStatus('已完成', 'done');
+      finishUI();
+      loadWorks();
+    } else if (ev.type === 'error') {
+      appendLog({ ts: '', agent: '系统', message: '✖ ' + ev.message });
+      setStatus('失败', 'fail');
+      finishUI();
+      loadWorks();
+    }
+  };
+  es.onerror = () => { /* 由 done/error 事件驱动收尾 */ };
+}
+
+function finishUI() {
+  $('gen-btn').disabled = false;
+  $('gen-btn').textContent = '⚡ 一键生成漫剧';
+  $('btn-pause').disabled = true;
+  $('btn-pause').textContent = '⏸ 暂停';
+  currentTaskId = null;
+  paused = false;
+  if (es) { es.close(); es = null; }
+}
+
+// ================= 我的作品 =================
+async function loadWorks() {
+  try {
+    const resp = await api('/tasks');
+    const tasks = await resp.json();
+    const box = $('works');
+    if (!tasks.length) {
+      box.innerHTML = '<div class="empty-tip">还没有作品，先生成一部吧</div>';
+      return;
+    }
+    box.innerHTML = '';
+    tasks.forEach(t => {
+      const row = document.createElement('div');
+      row.className = 'work-row';
+      const stMap = { done: '已完成', failed: '失败', running: '生成中' };
+      row.innerHTML = `
+        <span class="w-title">${esc(t.title || t.task_id)}</span>
+        <span class="w-chip ${t.status}">${stMap[t.status] || t.status}</span>
+        <span class="w-time">${(t.created_at || '').substring(5, 16)}</span>`;
+      row.onclick = () => openTask(t);
+      box.appendChild(row);
+    });
+  } catch { /* ignore */ }
+}
+
+function openTask(t) {
+  clearTrace();
+  $('log').innerHTML = '';
+  $('video-panel').classList.remove('show');
+  $('player').removeAttribute('src');
+  $('bar').style.width = t.progress + '%';
+  $('pct').textContent = t.progress + '%';
+  if (t.status === 'done') {
+    setStatus('已完成', 'done');
+    $('video-panel').classList.add('show');
+    $('player').src = t.final_video;
+    $('download').href = t.final_video;
+    $('btn-pause').disabled = true;
+  } else if (t.status === 'failed') {
+    setStatus('失败', 'fail');
+    $('btn-pause').disabled = true;
+  } else {
+    setStatus('生成中', 'run');
+    // 暂停状态由 SSE 重放的 paused/resumed 事件同步
+    $('btn-pause').disabled = false;
+    $('btn-pause').textContent = '⏸ 暂停';
+  }
+  connectSSE(t.task_id);
+}
+
+// ================= 提交生成 =================
+$('gen-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('form-err');
+  const data = collectForm();
+  if (!data.plot) return showErr(err, '请填写剧情梗概');
+  if (!data.characters.length) return showErr(err, '请至少添加一个角色');
+  if (!data.scenes.length) return showErr(err, '请至少添加一个场景');
+  hideErr(err);
+
+  $('gen-btn').disabled = true;
+  $('gen-btn').textContent = '⏳ 生成中…（任务排队执行，可稍后在"我的作品"查看）';
+  $('bar').style.width = '0%'; $('pct').textContent = '0%';
+  $('log').innerHTML = ''; $('video-panel').classList.remove('show');
+  $('player').removeAttribute('src');
+  clearTrace();
+  setStatus('任务提交中', 'run');
+
+  try {
+    const resp = await api('/generate', { method: 'POST', body: JSON.stringify(data) });
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.detail || '提交失败');
+    connectSSE(body.task_id);
+  } catch (ex) {
+    showErr(err, '提交失败：' + ex.message);
+    finishUI();
+  }
+});
+
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+function hideErr(el) { el.style.display = 'none'; }
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# Web 框架
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# 配置与 HTTP
+python-dotenv>=1.0
+httpx>=0.27
+
+# 通义千问（OpenAI 兼容协议，Function Calling 依赖）
+openai>=1.30
+
+# 数据校验
+pydantic>=2.6
+
+# 数据库与认证（v2.0：用户体系 + 任务记录 + 链路追踪）
+sqlalchemy>=2.0
+pyjwt>=2.8
+bcrypt>=4.1
